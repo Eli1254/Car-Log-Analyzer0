@@ -28,10 +28,19 @@ data2 = load_data(file2) if file2 else None
 if data1 is not None:
 
     st.sidebar.header("Vehicle & Data Filters")
+
     weight = st.sidebar.number_input("Vehicle Weight (lbs)", min_value=1500, max_value=6000, value=3200, step=50)
     altitude = st.sidebar.number_input("Altitude (ft)", min_value=0, max_value=15000, value=7300, step=100)
 
-    # Basic filters
+    drivetrain = st.sidebar.selectbox("Drivetrain", options=["AWD", "RWD", "FWD"], index=0)
+    cylinders = st.sidebar.slider("Number of Cylinders", min_value=3, max_value=12, value=4, step=1)
+
+    st.sidebar.markdown("---")
+
+    # Data overview rows slider
+    max_rows = len(data1)
+    preview_rows = st.sidebar.slider("Rows to show in Data Overview", min_value=5, max_value=max_rows, value=min(20, max_rows), step=5)
+
     rpm_min, rpm_max = st.sidebar.slider("RPM Range", int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max()), (int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max())), step=100)
     throttle_col = next((c for c in data1.columns if "throttle" in c.lower()), None)
     load_col = next((c for c in data1.columns if "load" in c.lower()), None)
@@ -88,12 +97,18 @@ if data1 is not None:
 
     if "Data Overview" in options:
         st.header("Data Overview")
-        show_data_overview(data1_filtered)
+        show_data_overview(data1_filtered, max_rows=preview_rows)
 
     if "Sensor Data Over Time" in options:
         st.header("Sensor Data Over Time")
-        sensor = st.selectbox("Select sensor to plot:", data1.columns)
-        plot_sensor_data(data1_filtered, sensor)
+        # Allow user to pick sensor from numeric columns
+        numeric_cols = [col for col in data1_filtered.columns if pd.api.types.is_numeric_dtype(data1_filtered[col])]
+        sensor = st.selectbox("Select sensor to plot", numeric_cols)
+        highlight = st.checkbox("Highlight top 3 peaks in sensor", value=False)
+        metric = None
+        if highlight:
+            metric = st.selectbox("Select metric to highlight peaks", numeric_cols, index=0)
+        plot_sensor_data(data1_filtered, sensor, highlight_events=highlight, metric=metric)
 
     if "3D Timing Table" in options:
         st.header("3D Timing Table")
@@ -117,7 +132,7 @@ if data1 is not None:
 
     if "0-60 Estimate" in options and max_hp is not None:
         st.header("0-60 mph Estimate")
-        estimate_zero_to_sixty(max_hp, weight, altitude)
+        estimate_zero_to_sixty(max_hp, weight, altitude, drivetrain, cylinders)
 
     if "1/4 Mile Estimate" in options and max_hp is not None:
         st.header("1/4 Mile Estimate")
@@ -137,5 +152,3 @@ if data1 is not None:
 
 else:
     st.info("Please upload at least one datalog CSV file to start analysis.")
-
-
