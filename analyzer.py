@@ -297,14 +297,21 @@ def calc_wheel_hp_torque(data, drivetrain_loss_pct=15):
         st.warning(f"⚠️ Error calculating wheel HP/torque: {e}")
     return data
 
-def estimate_quarter_mile(data):
+def adjust_hp_for_altitude(hp, altitude_ft):
+    """
+    Adjust horsepower based on altitude using a simple air density model.
+    Roughly, horsepower decreases about 3% per 1000 ft elevation gain.
+    """
+    if altitude_ft < 0:
+        altitude_ft = 0
+    correction_factor = 1 - (0.03 * altitude_ft / 1000)
+    correction_factor = max(correction_factor, 0.5)  # Don't allow less than 50%
+    return hp * correction_factor
+
+def estimate_quarter_mile(data, vehicle_weight, altitude):
     if data is None:
         st.warning("⚠️ No data for quarter mile estimate.")
         return
-
-    weight_lbs = 3000  # Default weight
-    if 'Vehicle Weight (lbs)' in data.columns:
-        weight_lbs = data['Vehicle Weight (lbs)'].iloc[0]
 
     if 'Estimated Horsepower' not in data.columns:
         st.warning("⚠️ Estimated Horsepower required for 1/4 mile estimate.")
@@ -315,11 +322,50 @@ def estimate_quarter_mile(data):
         st.warning("⚠️ Invalid horsepower data for 1/4 mile estimate.")
         return
 
+    # Adjust horsepower for altitude
+    corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
+
     try:
-        et = 6.29 * (weight_lbs / max_hp) ** (1/3)
-        st.write(f"Estimated 1/4 Mile ET: **{et:.2f} seconds** (weight = {weight_lbs} lbs, max HP = {max_hp:.1f})")
+        et = 6.29 * (vehicle_weight / corrected_hp) ** (1/3)
+        st.write(f"### Estimated 1/4 Mile ET")
+        st.write(f"- Vehicle weight: **{vehicle_weight} lbs**")
+        st.write(f"- Max Estimated HP at altitude {altitude} ft: **{corrected_hp:.1f} HP**")
+        st.write(f"- **Estimated ET: {et:.2f} seconds** (under perfect conditions)")
     except Exception as e:
         st.warning(f"⚠️ Error calculating quarter mile estimate: {e}")
+
+def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
+    if data is None:
+        st.warning("⚠️ No data for 0-60 estimate.")
+        return
+
+    if 'Estimated Horsepower' not in data.columns:
+        st.warning("⚠️ Estimated Horsepower required for 0-60 estimate.")
+        return
+
+    max_hp = data['Estimated Horsepower'].max()
+    if max_hp <= 0:
+        st.warning("⚠️ Invalid horsepower data for 0-60 estimate.")
+        return
+
+    # Adjust horsepower for altitude
+    corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
+
+    wheel_hp = corrected_hp * (1 - drivetrain_loss_pct / 100)
+    if wheel_hp <= 0:
+        st.warning("⚠️ Invalid wheel horsepower for 0-60 estimate.")
+        return
+
+    k = 5.825  # constant from tuning forums / empirical
+
+    try:
+        zero_to_sixty = (k * vehicle_weight) / wheel_hp
+        st.write(f"### Estimated 0-60 mph Time")
+        st.write(f"- Vehicle weight: **{vehicle_weight} lbs**")
+        st.write(f"- Estimated Wheel HP (after {drivetrain_loss_pct}% drivetrain loss) at altitude {altitude} ft: **{wheel_hp:.1f} HP**")
+        st.write(f"- **Estimated 0-60 mph: {zero_to_sixty:.2f} seconds** (under perfect conditions)")
+    except Exception as e:
+        st.warning(f"⚠️ Error calculating 0-60 estimate: {e}")
 
 
 
