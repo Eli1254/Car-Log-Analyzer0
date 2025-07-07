@@ -23,7 +23,7 @@ if uploaded_file:
     st.header("📊 Data Overview")
 
     st.subheader("Preview Data")
-    num_rows = st.slider("Number of rows to preview:", 5, min(50, len(data)), 10)
+    num_rows = st.slider("Number of rows to preview:", 5, min(500, len(data)), 10)
     st.dataframe(data.head(num_rows))
 
     st.subheader("Top Significant Events")
