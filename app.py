@@ -1,12 +1,10 @@
-# app.py
-
 import streamlit as st
 import pandas as pd
 from analyzer import CarLogAnalyzer
 
 st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
-st.title("Car Log Analyzer")
+st.title("🚗 Car Log Analyzer")
 st.markdown("Upload your CSV log file and visualize your car's performance data.")
 
 uploaded_file = st.file_uploader("Upload CSV file", type="csv")
@@ -21,8 +19,21 @@ if uploaded_file:
 
     analyzer = CarLogAnalyzer(data)
 
+    # 📊 Data Overview
     st.header("📊 Data Overview")
-    st.dataframe(data.head())
+
+    st.subheader("Preview Data")
+    num_rows = st.slider("Number of rows to preview:", 5, min(50, len(data)), 10)
+    st.dataframe(data.head(num_rows))
+
+    st.subheader("Top Significant Events")
+    important_metric = st.selectbox(
+        "Select metric to sort by:",
+        [col for col in data.columns if data[col].dtype != 'O'],
+        index=0
+    )
+    top_n = st.slider("How many top events to show?", 1, 50, 10)
+    st.dataframe(data.sort_values(by=important_metric, ascending=False).head(top_n))
 
     st.sidebar.header("Plot Options")
 
@@ -35,11 +46,22 @@ if uploaded_file:
         ]
     )
 
+    highlight_events = st.sidebar.checkbox("Highlight significant events?", value=False)
+
+    if highlight_events:
+        # Pick top 3 events for the selected metric
+        events_df = data.sort_values(by=important_metric, ascending=False).head(3)
+        events = []
+        for _, row in events_df.iterrows():
+            events.append({"time": row["Time (sec)"], "label": f"{important_metric}: {row[important_metric]:.1f}"})
+    else:
+        events = None
+
     if plot_type == "Sensor over Time":
         sensor = st.sidebar.selectbox("Select sensor", data.columns)
         if st.sidebar.button("Generate Plot"):
             try:
-                buf = analyzer.plot_sensor(sensor)
+                buf = analyzer.plot_sensor(sensor, events)
                 st.image(buf, caption=f"{sensor} over Time")
             except Exception as e:
                 st.error(str(e))
@@ -67,3 +89,4 @@ if uploaded_file:
                 st.image(buf, caption="Boost vs RPM (smoothed)")
             except Exception as e:
                 st.error(str(e))
+
