@@ -42,7 +42,7 @@ uploaded_file2 = st.file_uploader("Optional: upload second log for comparison", 
 data1 = load_data(uploaded_file1) if uploaded_file1 else None
 data2 = load_data(uploaded_file2) if uploaded_file2 else None
 
-if not data1:
+if data1 is None:
     st.info("👆 Please upload at least one log file to get started.")
     st.stop()
 
