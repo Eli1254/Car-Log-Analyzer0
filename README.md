@@ -11,10 +11,10 @@ A user-friendly web app to analyze and visualize car log CSV data.
 ✅ Plot Boost vs RPM with smoothing  
 ✅ Download augmented data
 
-## 🚀 How to run
+##  How to run
 1. Download file via accessport manager
 2. Run app and install dependecies (if needed):
 3. Upload csv file to app and view results
 
 *Beta Version (Tested for subaru but may work with other vehicles using csvs files through COBB or Open Source software).*
-* Horsepower estimation is a very ball-park estimate based on rough calculations and requires the parameters: Time (sec), RPM (RPM), and Req Torque (Nm) to function properly*
+ Horsepower estimation is a very ball-park estimate based on rough calculations and requires the parameters: Time (sec), RPM (RPM), and Req Torque (Nm) to function properly.
