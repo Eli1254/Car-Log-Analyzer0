@@ -6,7 +6,7 @@ from analyzer import CarLogAnalyzer
 
 st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
-st.title("🚗 Car Log Analyzer")
+st.title("Car Log Analyzer")
 st.markdown("Upload your CSV log file and visualize your car's performance data.")
 
 uploaded_file = st.file_uploader("Upload CSV file", type="csv")
