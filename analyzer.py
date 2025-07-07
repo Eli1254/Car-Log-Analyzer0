@@ -308,7 +308,10 @@ def adjust_hp_for_altitude(hp, altitude_ft):
     correction_factor = max(correction_factor, 0.5)  # Don't allow less than 50%
     return hp * correction_factor
 
+
 def estimate_quarter_mile(data, vehicle_weight, altitude):
+    import streamlit as st
+
     if data is None:
         st.warning("⚠️ No data for quarter mile estimate.")
         return
@@ -322,7 +325,6 @@ def estimate_quarter_mile(data, vehicle_weight, altitude):
         st.warning("⚠️ Invalid horsepower data for 1/4 mile estimate.")
         return
 
-    # Adjust horsepower for altitude
     corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
 
     try:
@@ -334,7 +336,10 @@ def estimate_quarter_mile(data, vehicle_weight, altitude):
     except Exception as e:
         st.warning(f"⚠️ Error calculating quarter mile estimate: {e}")
 
+
 def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
+    import streamlit as st
+
     if data is None:
         st.warning("⚠️ No data for 0-60 estimate.")
         return
@@ -348,15 +353,14 @@ def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
         st.warning("⚠️ Invalid horsepower data for 0-60 estimate.")
         return
 
-    # Adjust horsepower for altitude
     corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
-
     wheel_hp = corrected_hp * (1 - drivetrain_loss_pct / 100)
+
     if wheel_hp <= 0:
         st.warning("⚠️ Invalid wheel horsepower for 0-60 estimate.")
         return
 
-    k = 5.825  # constant from tuning forums / empirical
+    k = 5.825  # empirical constant
 
     try:
         zero_to_sixty = (k * vehicle_weight) / wheel_hp
@@ -366,6 +370,5 @@ def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
         st.write(f"- **Estimated 0-60 mph: {zero_to_sixty:.2f} seconds** (under perfect conditions)")
     except Exception as e:
         st.warning(f"⚠️ Error calculating 0-60 estimate: {e}")
-
 
 
