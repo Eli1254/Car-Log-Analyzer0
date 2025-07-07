@@ -14,12 +14,20 @@ def load_data(file):
         st.error(f"❌ Error loading data: {e}")
         return None
 
-def show_data_overview(data, max_rows=20):
+def show_data_overview(data, max_rows=500):
     st.write("### Data Preview")
     st.dataframe(data.head(max_rows))
     st.write(f"Shape: {data.shape}")
     st.write("Columns:", list(data.columns))
-    st.write("Missing values:", data.isnull().sum())
+
+    missing = data.isnull().sum()
+    missing = missing[missing > 0]
+    if not missing.empty:
+        st.write("### Missing Values")
+        st.dataframe(missing)
+    else:
+        st.write("✅ No missing values detected.")
+
 
 def plot_sensor_data(data, sensor, highlight_events=False, metric=None):
     if sensor not in data.columns:
