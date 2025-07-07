@@ -154,15 +154,25 @@ def estimate_quarter_mile(data, weight, altitude):
     et = 6.29 * (weight / corrected_hp) ** (1/3)
     st.write(f"Estimated 1/4 Mile: **{et:.2f} sec**")
 
-def estimate_0_60(data, weight, altitude):
-    if 'Estimated Horsepower' not in data.columns:
-        st.warning("⚠️ Run HP estimation first.")
+def estimate_0_60(data, weight, altitude, drivetrain_loss_pct=15):
+    if data is None:
+        st.warning("⚠️ No data for 0-60 estimate.")
         return
+
+    if 'Estimated Horsepower' not in data.columns:
+        st.warning("⚠️ Run horsepower estimation first.")
+        return
+
     max_hp = data['Estimated Horsepower'].max()
     correction = max(0.5, 1 - 0.03 * (altitude / 1000))
-    wheel_hp = max_hp * correction * 0.85
-    t = (5.825 * weight) / wheel_hp
-    st.write(f"Estimated 0–60 mph: **{t:.2f} sec**")
+    corrected_hp = max_hp * correction
+    wheel_hp = corrected_hp * (1 - drivetrain_loss_pct / 100)
+
+    # Use physics-based formula for 0-60 time (approx)
+    # t_0_60 = k * (weight / wheel_hp), k ~ 5.825 (empirical)
+    t_0_60 = 5.825 * weight / wheel_hp
+    st.write(f"Estimated 0–60 mph Time: **{t_0_60:.2f} seconds** (weight={weight} lbs, corrected HP={corrected_hp:.1f})")
+
 
 def show_complex_statistics(data):
     st.write("### Descriptive Stats")
