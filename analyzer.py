@@ -3,171 +3,169 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import savgol_filter
 from mpl_toolkits.mplot3d import Axes3D
-import streamlit as st
 import seaborn as sns
+import streamlit as st
+import io
 
-
-def load_data(file) -> pd.DataFrame:
-    if file is None:
-        return None
+def load_data(file):
     try:
-        return pd.read_csv(file, encoding='ISO-8859-1')
-    except UnicodeDecodeError:
-        return pd.read_csv(file, encoding='utf-8', errors='replace')
-
-
-def plot_sensor_data(data, sensor_name):
-    if sensor_name not in data.columns:
-        st.warning(f"Sensor {sensor_name} not found.")
-        return
-    st.line_chart(data[sensor_name])
-
-
-def show_complex_statistics(data):
-    numeric = data.select_dtypes(include=np.number)
-    desc = numeric.describe().T
-    desc["variance"] = numeric.var()
-    desc["skewness"] = numeric.skew()
-    st.write(desc)
-
-    st.subheader("Correlation Heatmap")
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(numeric.corr(), annot=True, fmt=".2f", cmap="coolwarm", cbar=True, square=True, ax=ax)
-    plt.xticks(rotation=45)
-    plt.yticks(rotation=0)
-    st.pyplot(fig)
-
-
-def filter_by_time_range(data, start, end):
-    return data[(data['Time (sec)'] >= start) & (data['Time (sec)'] <= end)]
-
-
-def plot_boost_vs_rpm(data, window_length, poly_order):
-    if 'RPM (RPM)' not in data.columns or 'Boost (psi)' not in data.columns:
-        st.warning("Required columns missing.")
-        return
-
-    boost = savgol_filter(data['Boost (psi)'], window_length, poly_order)
-    fig, ax = plt.subplots()
-    ax.plot(data['RPM (RPM)'], boost, label="Boost (psi)")
-    ax.set_xlabel("RPM")
-    ax.set_ylabel("Boost (psi)")
-    ax.grid()
-    st.pyplot(fig)
-
-
-def plot_torque_vs_rpm(data, window_length, poly_order):
-    if 'RPM (RPM)' not in data.columns or 'Req Torque (Nm)' not in data.columns:
-        st.warning("Required columns missing.")
-        return
-
-    torque = savgol_filter(data['Req Torque (Nm)'], window_length, poly_order)
-    fig, ax = plt.subplots()
-    ax.plot(data['RPM (RPM)'], torque, label="Torque (Nm)")
-    ax.set_xlabel("RPM")
-    ax.set_ylabel("Torque (Nm)")
-    ax.grid()
-    st.pyplot(fig)
-
-
-def plot_boost_vs_torque(data, window_length, poly_order):
-    if 'Boost (psi)' not in data.columns or 'Req Torque (Nm)' not in data.columns:
-        st.warning("Required columns missing.")
-        return
-
-    boost = savgol_filter(data['Boost (psi)'], window_length, poly_order)
-    torque = savgol_filter(data['Req Torque (Nm)'], window_length, poly_order)
-
-    fig, ax = plt.subplots()
-    ax.plot(boost, torque, label="Boost vs Torque")
-    ax.set_xlabel("Boost (psi)")
-    ax.set_ylabel("Torque (Nm)")
-    ax.grid()
-    st.pyplot(fig)
-
-
-def estimate_horsepower_from_torque(data):
-    if 'Req Torque (Nm)' not in data.columns or 'RPM (RPM)' not in data.columns:
-        st.warning("Required columns missing.")
+        data = pd.read_csv(file, encoding='ISO-8859-1')
+        st.success("✅ Data loaded successfully.")
         return data
+    except FileNotFoundError:
+        st.error("❌ File not found.")
+        return None
+    except UnicodeDecodeError:
+        st.error("❌ File encoding error.")
+        return None
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {e}")
+        return None
 
-    torque_lbft = data['Req Torque (Nm)'] * 0.73756
-    data['Estimated Horsepower'] = (torque_lbft * data['RPM (RPM)']) / 5252
+def check_required_columns(data, required_cols, context=""):
+    missing = [col for col in required_cols if col not in data.columns]
+    if missing:
+        st.warning(f"⚠️ Missing columns for {context}: {', '.join(missing)}")
+        return False
+    return True
 
-    fig, ax = plt.subplots()
-    ax.plot(data['RPM (RPM)'], data['Estimated Horsepower'], label="Estimated HP")
-    ax.set_xlabel("RPM")
-    ax.set_ylabel("Horsepower")
-    ax.grid()
-    st.pyplot(fig)
+def show_data_overview(data, max_rows=20):
+    if data is None or data.empty:
+        st.warning("⚠️ No data to preview.")
+        return
+    st.write("### Data Preview")
+    st.dataframe(data.head(max_rows))
+    st.write(f"Shape: {data.shape}")
+    st.write("Columns:", list(data.columns))
 
-    return data
+    missing = data.isnull().sum()
+    missing = missing[missing > 0]
+    if not missing.empty:
+        st.write("### Missing Values")
+        st.dataframe(missing)
+    else:
+        st.write("✅ No missing values detected.")
 
+def _safe_savgol_filter(series, window_length=51, poly_order=3):
+    try:
+        length = len(series)
+        if length < 5:
+            return series
+        wl = min(window_length, length if length % 2 != 0 else length - 1)
+        if wl < poly_order + 2:
+            wl = poly_order + 2 if (poly_order + 2) % 2 != 0 else poly_order + 3
+        if wl > length:
+            wl = length if length % 2 != 0 else length - 1
+        return savgol_filter(series, window_length=wl, polyorder=poly_order)
+    except Exception:
+        return series
+
+def plot_sensor_data(data, sensor, highlight_events=False, metric=None, custom_events=None):
+    if data is None or sensor not in data.columns or 'Time (sec)' not in data.columns:
+        return
+
+    time = data['Time (sec)']
+    plt.figure(figsize=(12, 6))
+    plt.plot(time, data[sensor], label=sensor)
+    plt.xlabel("Time (sec)")
+    plt.ylabel(sensor)
+    plt.title(f"{sensor} over Time")
+    plt.grid(True)
+
+    if highlight_events and metric in data.columns:
+        top_events = data.nlargest(3, metric)
+        for _, row in top_events.iterrows():
+            plt.axvline(x=row['Time (sec)'], color='red', linestyle='--')
+            plt.text(row['Time (sec)'], data[sensor].min(), f"{metric}: {row[metric]:.1f}", rotation=90, color='red')
+
+    if custom_events:
+        for event in custom_events:
+            if 0 <= event['time'] <= time.max():
+                plt.axvline(x=event['time'], color='purple', linestyle=':')
+                plt.text(event['time'], data[sensor].min(), event['label'], rotation=90, color='purple')
+
+    st.pyplot(plt)
 
 def plot_3d_timing_table(data):
-    if not all(c in data.columns for c in ['RPM (RPM)', 'Calculated Load (g/rev)', 'Ignition Timing (°)']):
-        st.warning("Required columns missing.")
+    if not check_required_columns(data, ['RPM (RPM)', 'Calculated Load (g/rev)', 'Ignition Timing (°)'], "3D Timing Table"):
         return
-
-    fig = plt.figure()
+    fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
-    sc = ax.scatter(
-        data['RPM (RPM)'],
-        data['Calculated Load (g/rev)'],
-        data['Ignition Timing (°)'],
-        c=data['Ignition Timing (°)'],
-        cmap='viridis'
+    scatter = ax.scatter(
+        data['RPM (RPM)'], data['Calculated Load (g/rev)'], data['Ignition Timing (°)'],
+        c=data['Ignition Timing (°)'], cmap='viridis'
     )
-    fig.colorbar(sc, label="Ignition Timing")
+    fig.colorbar(scatter, label="Timing (°)")
     ax.set_xlabel("RPM")
     ax.set_ylabel("Load (g/rev)")
     ax.set_zlabel("Timing (°)")
+    ax.set_title("3D Timing Table")
     st.pyplot(fig)
 
-
-def plot_with_events(data, sensor_name, events):
-    if sensor_name not in data.columns:
-        st.warning(f"Sensor {sensor_name} not found.")
+def plot_boost_vs_rpm(data, window_length=51, poly_order=3):
+    if not check_required_columns(data, ['RPM (RPM)', 'Boost (psi)'], "Boost vs RPM"):
         return
+    boost_smoothed = _safe_savgol_filter(data['Boost (psi)'], window_length, poly_order)
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['RPM (RPM)'], boost_smoothed, label="Boost (Smoothed)", color='blue')
+    plt.xlabel("RPM")
+    plt.ylabel("Boost (psi)")
+    plt.title("Boost vs RPM")
+    plt.grid(True)
+    plt.legend()
+    st.pyplot(plt)
 
-    fig, ax = plt.subplots()
-    ax.plot(data['Time (sec)'], data[sensor_name], label=sensor_name)
+def plot_torque_vs_rpm(data, window_length=51, poly_order=3):
+    if not check_required_columns(data, ['RPM (RPM)', 'Req Torque (Nm)'], "Torque vs RPM"):
+        return
+    torque_smoothed = _safe_savgol_filter(data['Req Torque (Nm)'], window_length, poly_order)
+    plt.figure(figsize=(12, 6))
+    plt.plot(data['RPM (RPM)'], torque_smoothed, label="Torque (Smoothed)", color='orange')
+    plt.xlabel("RPM")
+    plt.ylabel("Torque (Nm)")
+    plt.title("Torque vs RPM")
+    plt.grid(True)
+    plt.legend()
+    st.pyplot(plt)
 
-    for event in events:
-        ax.axvline(event['time'], color='red', linestyle='--')
-        ax.text(event['time'], ax.get_ylim()[0], event['label'], rotation=90, color='red')
+def estimate_horsepower(data):
+    if not check_required_columns(data, ['RPM (RPM)', 'Req Torque (Nm)'], "Horsepower Estimation"):
+        return
+    rpm = data['RPM (RPM)']
+    torque_lbft = data['Req Torque (Nm)'] * 0.73756
+    hp = (torque_lbft * rpm) / 5252
+    data['Estimated Horsepower'] = hp
+    plt.figure(figsize=(12, 6))
+    plt.plot(rpm, hp, label="Estimated HP", color='green')
+    plt.xlabel("RPM")
+    plt.ylabel("Horsepower")
+    plt.title("Estimated Horsepower vs RPM")
+    plt.grid(True)
+    plt.legend()
+    st.pyplot(plt)
 
-    ax.set_xlabel("Time (sec)")
-    ax.set_ylabel(sensor_name)
-    st.pyplot(fig)
-
-
-def adjust_hp_for_altitude(hp, altitude_ft):
-    correction_factor = 1 - (0.03 * altitude_ft / 1000)
-    correction_factor = max(correction_factor, 0.5)
-    return hp * correction_factor
-
-
-def estimate_quarter_mile(data, vehicle_weight, altitude):
+def estimate_quarter_mile(data, weight, altitude):
     if 'Estimated Horsepower' not in data.columns:
-        st.warning("Run horsepower estimation first.")
+        st.warning("⚠️ Run HP estimation first.")
         return
-
     max_hp = data['Estimated Horsepower'].max()
-    corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
-    et = 6.29 * (vehicle_weight / corrected_hp) ** (1/3)
+    correction = max(0.5, 1 - 0.03 * (altitude / 1000))
+    corrected_hp = max_hp * correction
+    et = 6.29 * (weight / corrected_hp) ** (1/3)
+    st.write(f"Estimated 1/4 Mile: **{et:.2f} sec**")
 
-    st.write(f"**Estimated 1/4 Mile ET: {et:.2f} seconds**")
-
-
-def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
+def estimate_0_60(data, weight, altitude):
     if 'Estimated Horsepower' not in data.columns:
-        st.warning("Run horsepower estimation first.")
+        st.warning("⚠️ Run HP estimation first.")
         return
-
     max_hp = data['Estimated Horsepower'].max()
-    corrected_hp = adjust_hp_for_altitude(max_hp, altitude)
-    wheel_hp = corrected_hp * (1 - drivetrain_loss_pct / 100)
-    zero_to_sixty = (5.825 * vehicle_weight) / wheel_hp
+    correction = max(0.5, 1 - 0.03 * (altitude / 1000))
+    wheel_hp = max_hp * correction * 0.85
+    t = (5.825 * weight) / wheel_hp
+    st.write(f"Estimated 0–60 mph: **{t:.2f} sec**")
 
-    st.write(f"**Estimated 0-60 mph Time: {zero_to_sixty:.2f} seconds**")
+def show_complex_statistics(data):
+    st.write("### Descriptive Stats")
+    st.dataframe(data.describe())
+    st.write("### Correlation Matrix")
+    st.dataframe(data.corr())
