@@ -6,7 +6,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import streamlit as st
 import seaborn as sns
 
+
 def load_data(file) -> pd.DataFrame:
+    if file is None:
+        return None
     try:
         return pd.read_csv(file, encoding='ISO-8859-1')
     except UnicodeDecodeError:
@@ -17,7 +20,6 @@ def plot_sensor_data(data, sensor_name):
     if sensor_name not in data.columns:
         st.warning(f"Sensor {sensor_name} not found.")
         return
-
     st.line_chart(data[sensor_name])
 
 
@@ -29,8 +31,10 @@ def show_complex_statistics(data):
     st.write(desc)
 
     st.subheader("Correlation Heatmap")
-    fig, ax = plt.subplots(figsize=(8,6))
-    sns.heatmap(numeric.corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(numeric.corr(), annot=True, fmt=".2f", cmap="coolwarm", cbar=True, square=True, ax=ax)
+    plt.xticks(rotation=45)
+    plt.yticks(rotation=0)
     st.pyplot(fig)
 
 
@@ -38,12 +42,12 @@ def filter_by_time_range(data, start, end):
     return data[(data['Time (sec)'] >= start) & (data['Time (sec)'] <= end)]
 
 
-def plot_boost_vs_rpm(data):
+def plot_boost_vs_rpm(data, window_length, poly_order):
     if 'RPM (RPM)' not in data.columns or 'Boost (psi)' not in data.columns:
         st.warning("Required columns missing.")
         return
 
-    boost = savgol_filter(data['Boost (psi)'], 51, 3)
+    boost = savgol_filter(data['Boost (psi)'], window_length, poly_order)
     fig, ax = plt.subplots()
     ax.plot(data['RPM (RPM)'], boost, label="Boost (psi)")
     ax.set_xlabel("RPM")
@@ -52,12 +56,12 @@ def plot_boost_vs_rpm(data):
     st.pyplot(fig)
 
 
-def plot_torque_vs_rpm(data):
+def plot_torque_vs_rpm(data, window_length, poly_order):
     if 'RPM (RPM)' not in data.columns or 'Req Torque (Nm)' not in data.columns:
         st.warning("Required columns missing.")
         return
 
-    torque = savgol_filter(data['Req Torque (Nm)'], 51, 3)
+    torque = savgol_filter(data['Req Torque (Nm)'], window_length, poly_order)
     fig, ax = plt.subplots()
     ax.plot(data['RPM (RPM)'], torque, label="Torque (Nm)")
     ax.set_xlabel("RPM")
@@ -66,13 +70,13 @@ def plot_torque_vs_rpm(data):
     st.pyplot(fig)
 
 
-def plot_boost_vs_torque(data):
+def plot_boost_vs_torque(data, window_length, poly_order):
     if 'Boost (psi)' not in data.columns or 'Req Torque (Nm)' not in data.columns:
         st.warning("Required columns missing.")
         return
 
-    boost = savgol_filter(data['Boost (psi)'], 51, 3)
-    torque = savgol_filter(data['Req Torque (Nm)'], 51, 3)
+    boost = savgol_filter(data['Boost (psi)'], window_length, poly_order)
+    torque = savgol_filter(data['Req Torque (Nm)'], window_length, poly_order)
 
     fig, ax = plt.subplots()
     ax.plot(boost, torque, label="Boost vs Torque")
@@ -167,4 +171,3 @@ def estimate_0_60_time(data, vehicle_weight, altitude, drivetrain_loss_pct=15):
     zero_to_sixty = (5.825 * vehicle_weight) / wheel_hp
 
     st.write(f"**Estimated 0-60 mph Time: {zero_to_sixty:.2f} seconds**")
-
