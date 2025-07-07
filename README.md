@@ -16,5 +16,5 @@ A user-friendly web app to analyze and visualize car log CSV data.
 2. Run app and install dependecies (if needed):
 3. Upload csv file to app and view results
 
-*Beta Version (Tested for subaru but may work with other vehicles using csvs files through COBB or Open Source software)*
-*Horsepower estimation is a very ball-park estimate based on rough calculations and requires the parameters: Time (sec), RPM (RPM), and Req Torque (Nm) to function properly*
+*Beta Version (Tested for subaru but may work with other vehicles using csvs files through COBB or Open Source software).*
+* Horsepower estimation is a very ball-park estimate based on rough calculations and requires the parameters: Time (sec), RPM (RPM), and Req Torque (Nm) to function properly*
