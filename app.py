@@ -19,80 +19,123 @@ st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
 st.title("🚗 Car Log Analyzer")
 
-# Upload primary datalog CSV
 file1 = st.file_uploader("Upload your primary datalog CSV", type=["csv"])
-data1 = load_data(file1) if file1 else None
-
-# Upload second datalog CSV for comparison (optional)
 file2 = st.file_uploader("Upload second datalog CSV for comparison (optional)", type=["csv"])
+
+data1 = load_data(file1) if file1 else None
 data2 = load_data(file2) if file2 else None
 
 if data1 is not None:
 
-    st.sidebar.header("Vehicle Parameters for Performance Estimates")
-    vehicle_weight_lbs = st.sidebar.number_input("Vehicle Weight (lbs)", min_value=1500, max_value=6000, value=3200, step=50)
-    altitude_ft = st.sidebar.number_input("Altitude (ft)", min_value=0, max_value=15000, value=5500, step=100)
+    st.sidebar.header("Vehicle & Data Filters")
+    weight = st.sidebar.number_input("Vehicle Weight (lbs)", min_value=1500, max_value=6000, value=3200, step=50)
+    altitude = st.sidebar.number_input("Altitude (ft)", min_value=0, max_value=15000, value=7300, step=100)
 
-    st.sidebar.markdown("---")
-    st.sidebar.write("**Use this section to adjust filters (optional):**")
-    rpm_min, rpm_max = st.sidebar.slider("RPM Range", 0, 9000, (1500, 7000), step=100)
-    thr_min, thr_max = st.sidebar.slider("Throttle Position (%) Range", 0, 100, (0, 100))
-    load_min, load_max = st.sidebar.slider("Calculated Load (g/rev) Range", 0.0, 2.0, (0.0, 2.0), step=0.01)
-
-    # Detect throttle and load columns (approximate)
-    throttle_col = None
-    load_col = None
-    for col in data1.columns:
-        if "throttle" in col.lower():
-            throttle_col = col
-            break
-    for col in data1.columns:
-        if "load" in col.lower():
-            load_col = col
-            break
+    # Basic filters
+    rpm_min, rpm_max = st.sidebar.slider("RPM Range", int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max()), (int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max())), step=100)
+    throttle_col = next((c for c in data1.columns if "throttle" in c.lower()), None)
+    load_col = next((c for c in data1.columns if "load" in c.lower()), None)
+    
+    if throttle_col:
+        thr_min, thr_max = st.sidebar.slider(f"{throttle_col} Range", float(data1[throttle_col].min()), float(data1[throttle_col].max()), (float(data1[throttle_col].min()), float(data1[throttle_col].max())))
+    else:
+        thr_min, thr_max = None, None
+    if load_col:
+        load_min, load_max = st.sidebar.slider(f"{load_col} Range", float(data1[load_col].min()), float(data1[load_col].max()), (float(data1[load_col].min()), float(data1[load_col].max())))
+    else:
+        load_min, load_max = None, None
 
     # Filter data
     data1_filtered = data1[
         (data1['RPM (RPM)'] >= rpm_min) & (data1['RPM (RPM)'] <= rpm_max)
     ]
-    if throttle_col:
-        data1_filtered = data1_filtered[
-            (data1_filtered[throttle_col] >= thr_min) & (data1_filtered[throttle_col] <= thr_max)
-        ]
-    if load_col:
-        data1_filtered = data1_filtered[
-            (data1_filtered[load_col] >= load_min) & (data1_filtered[load_col] <= load_max)
-        ]
-
-    st.header("Data Overview & Stats")
-    show_data_overview(data1_filtered)
-
-    st.header("Performance Estimates & Graphs")
-
-    max_hp = estimate_horsepower(data1_filtered)
-
-    if max_hp:
-        est_0_60 = estimate_zero_to_sixty(max_hp, vehicle_weight_lbs, altitude_ft)
-        est_qtr_mile = estimate_quarter_mile(max_hp, vehicle_weight_lbs, altitude_ft)
-
-    st.header("Sensor Plots with Highlights")
-
-    plot_sensor_data(data1_filtered, sensor="Boost (psi)", highlight_events=True, metric="Req Torque (Nm)")
-    plot_boost_vs_rpm(data1_filtered)
-    plot_torque_vs_rpm(data1_filtered)
-    plot_boost_vs_torque(data1_filtered)
-
-    st.header("Ignition Timing and Knock / AFR Analysis")
-
-    plot_3d_timing_table(data1_filtered)
-    plot_timing_heatmap(data1_filtered)
-    plot_knock_afr(data1_filtered)
+    if throttle_col and thr_min is not None and thr_max is not None:
+        data1_filtered = data1_filtered[(data1_filtered[throttle_col] >= thr_min) & (data1_filtered[throttle_col] <= thr_max)]
+    if load_col and load_min is not None and load_max is not None:
+        data1_filtered = data1_filtered[(data1_filtered[load_col] >= load_min) & (data1_filtered[load_col] <= load_max)]
 
     if data2 is not None:
+        data2_filtered = data2[
+            (data2['RPM (RPM)'] >= rpm_min) & (data2['RPM (RPM)'] <= rpm_max)
+        ]
+        if throttle_col and thr_min is not None and thr_max is not None:
+            data2_filtered = data2_filtered[(data2_filtered[throttle_col] >= thr_min) & (data2_filtered[throttle_col] <= thr_max)]
+        if load_col and load_min is not None and load_max is not None:
+            data2_filtered = data2_filtered[(data2_filtered[load_col] >= load_min) & (data2_filtered[load_col] <= load_max)]
+    else:
+        data2_filtered = None
+
+    st.sidebar.markdown("---")
+    st.sidebar.header("Select Visualizations to Display")
+    options = st.sidebar.multiselect(
+        "Choose graphs and analyses:",
+        [
+            "Data Overview",
+            "Sensor Data Over Time",
+            "3D Timing Table",
+            "Boost vs RPM",
+            "Torque vs RPM",
+            "Boost vs Torque",
+            "Estimated Horsepower",
+            "0-60 Estimate",
+            "1/4 Mile Estimate",
+            "Knock & AFR Analysis",
+            "Ignition Timing Heatmap",
+            "Log Comparison",
+        ],
+        default=["Data Overview", "Estimated Horsepower"]
+    )
+
+    if "Data Overview" in options:
+        st.header("Data Overview")
+        show_data_overview(data1_filtered)
+
+    if "Sensor Data Over Time" in options:
+        st.header("Sensor Data Over Time")
+        sensor = st.selectbox("Select sensor to plot:", data1.columns)
+        plot_sensor_data(data1_filtered, sensor)
+
+    if "3D Timing Table" in options:
+        st.header("3D Timing Table")
+        plot_3d_timing_table(data1_filtered)
+
+    if "Boost vs RPM" in options:
+        st.header("Boost vs RPM")
+        plot_boost_vs_rpm(data1_filtered)
+
+    if "Torque vs RPM" in options:
+        st.header("Torque vs RPM")
+        plot_torque_vs_rpm(data1_filtered)
+
+    if "Boost vs Torque" in options:
+        st.header("Boost vs Torque")
+        plot_boost_vs_torque(data1_filtered)
+
+    max_hp = None
+    if "Estimated Horsepower" in options or "0-60 Estimate" in options or "1/4 Mile Estimate" in options:
+        max_hp = estimate_horsepower(data1_filtered)
+
+    if "0-60 Estimate" in options and max_hp is not None:
+        st.header("0-60 mph Estimate")
+        estimate_zero_to_sixty(max_hp, weight, altitude)
+
+    if "1/4 Mile Estimate" in options and max_hp is not None:
+        st.header("1/4 Mile Estimate")
+        estimate_quarter_mile(max_hp, weight, altitude)
+
+    if "Knock & AFR Analysis" in options:
+        st.header("Knock & AFR Analysis")
+        plot_knock_afr(data1_filtered)
+
+    if "Ignition Timing Heatmap" in options:
+        st.header("Ignition Timing Heatmap")
+        plot_timing_heatmap(data1_filtered)
+
+    if "Log Comparison" in options and data2_filtered is not None:
         st.header("Log Comparison")
-        plot_compare_logs(data1_filtered, data2)
+        plot_compare_logs(data1_filtered, data2_filtered)
 
 else:
-    st.info("Please upload at least one datalog CSV file to begin analysis.")
+    st.info("Please upload at least one datalog CSV file to start analysis.")
 
 
