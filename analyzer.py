@@ -2,11 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import savgol_filter
+from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import streamlit as st
 import io
-from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plots
-
 
 def load_data(file):
     try:
@@ -17,12 +16,11 @@ def load_data(file):
         st.error("❌ File not found. Please check the file.")
         return None
     except UnicodeDecodeError:
-        st.error("❌ File encoding error. Please ensure UTF-8 or ISO-8859-1 encoding.")
+        st.error("❌ File encoding error. Please ensure the file is UTF-8 or ISO-8859-1 encoded.")
         return None
     except Exception as e:
         st.error(f"❌ Unexpected error loading file: {e}")
         return None
-
 
 def check_required_columns(data, required_cols, context=""):
     missing = [col for col in required_cols if col not in data.columns]
@@ -30,7 +28,6 @@ def check_required_columns(data, required_cols, context=""):
         st.warning(f"⚠️ Missing required columns for {context}: {', '.join(missing)}")
         return False
     return True
-
 
 def show_data_overview(data, max_rows=20):
     if data is None or data.empty:
@@ -48,7 +45,6 @@ def show_data_overview(data, max_rows=20):
         st.dataframe(missing)
     else:
         st.write("✅ No missing values detected.")
-
 
 def plot_sensor_data(data, sensor, highlight_events=False, metric=None, custom_events=None):
     if data is None or sensor not in data.columns or 'Time (sec)' not in data.columns:
@@ -79,7 +75,6 @@ def plot_sensor_data(data, sensor, highlight_events=False, metric=None, custom_e
 
     st.pyplot(plt)
 
-
 def plot_3d_timing_table(data):
     required_cols = ['RPM (RPM)', 'Calculated Load (g/rev)', 'Ignition Timing (°)']
     if not check_required_columns(data, required_cols, "3D Timing Table"):
@@ -101,7 +96,6 @@ def plot_3d_timing_table(data):
     ax.set_title("3D Timing Table")
     st.pyplot(fig)
 
-
 def _safe_savgol_filter(series, window_length=51, poly_order=3):
     try:
         length = len(series)
@@ -118,7 +112,6 @@ def _safe_savgol_filter(series, window_length=51, poly_order=3):
         st.warning(f"⚠️ Error smoothing data: {e}")
         return series
 
-
 def plot_boost_vs_rpm(data, window_length=51, poly_order=3):
     if not check_required_columns(data, ['RPM (RPM)', 'Boost (psi)'], "Boost vs RPM"):
         return
@@ -133,7 +126,6 @@ def plot_boost_vs_rpm(data, window_length=51, poly_order=3):
     plt.legend()
     st.pyplot(plt)
 
-
 def plot_torque_vs_rpm(data, window_length=51, poly_order=3):
     if not check_required_columns(data, ['RPM (RPM)', 'Req Torque (Nm)'], "Torque vs RPM"):
         return
@@ -147,7 +139,6 @@ def plot_torque_vs_rpm(data, window_length=51, poly_order=3):
     plt.grid(True)
     plt.legend()
     st.pyplot(plt)
-
 
 def plot_boost_vs_torque(data, window_length=51, poly_order=3):
     if not check_required_columns(data, ['Boost (psi)', 'Req Torque (Nm)'], "Boost vs Torque"):
@@ -164,28 +155,63 @@ def plot_boost_vs_torque(data, window_length=51, poly_order=3):
     plt.legend()
     st.pyplot(plt)
 
-
-def estimate_horsepower(data):
+def estimate_horsepower(data, window_length=51, poly_order=3, drivetrain_loss_pct=15):
     if not check_required_columns(data, ['RPM (RPM)', 'Req Torque (Nm)'], "Horsepower Estimation"):
-        return
+        return None
 
     rpm = data['RPM (RPM)']
     torque_nm = data['Req Torque (Nm)']
     torque_lbft = torque_nm * 0.73756
-    hp = (torque_lbft * rpm) / 5252
+
+    crank_hp = (torque_lbft * rpm) / 5252
+    wheel_hp = crank_hp * (1 - drivetrain_loss_pct / 100)
+
+    try:
+        hp_smoothed = savgol_filter(wheel_hp, window_length=min(window_length, len(wheel_hp) if len(wheel_hp) % 2 != 0 else len(wheel_hp)-1), polyorder=poly_order)
+    except Exception as e:
+        st.warning(f"⚠️ Error smoothing horsepower data: {e}")
+        hp_smoothed = wheel_hp
+
+    max_hp = np.max(hp_smoothed)
 
     plt.figure(figsize=(12, 6))
-    plt.plot(rpm, hp, label="Estimated HP", color='green')
+    plt.plot(rpm, hp_smoothed, label="Estimated Wheel HP (Smoothed)", color='green')
     plt.xlabel("RPM")
-    plt.ylabel("Estimated Horsepower")
-    plt.title("Estimated Horsepower vs RPM (from Requested Torque)")
+    plt.ylabel("Horsepower (HP)")
+    plt.title(f"Estimated Wheel Horsepower vs RPM (Max: {max_hp:.1f} HP, Drivetrain loss {drivetrain_loss_pct}%)")
     plt.grid(True)
     plt.legend()
     st.pyplot(plt)
 
-    # Add horsepower to dataframe for further calculations
-    data['Estimated Horsepower'] = hp
+    return max_hp
 
+def estimate_zero_to_sixty(max_hp, vehicle_weight_lbs=3000, altitude_ft=0):
+    if max_hp is None or max_hp <= 0:
+        st.warning("⚠️ Valid horsepower required for 0-60 estimation.")
+        return None
+
+    altitude_loss_factor = 1 - (0.03 * altitude_ft / 1000)
+    effective_hp = max_hp * altitude_loss_factor
+
+    C = 5.8
+    b = 1/3
+    et = C * (vehicle_weight_lbs / effective_hp) ** b
+
+    st.write(f"Estimated 0-60 mph: **{et:.2f} seconds** (weight = {vehicle_weight_lbs} lbs, altitude = {altitude_ft} ft)")
+    return et
+
+def estimate_quarter_mile(max_hp, vehicle_weight_lbs=3000, altitude_ft=0):
+    if max_hp is None or max_hp <= 0:
+        st.warning("⚠️ Valid horsepower required for 1/4 mile estimation.")
+        return None
+
+    altitude_loss_factor = 1 - (0.03 * altitude_ft / 1000)
+    effective_hp = max_hp * altitude_loss_factor
+
+    et = 6.29 * (vehicle_weight_lbs / effective_hp) ** (1/3)
+
+    st.write(f"Estimated 1/4 Mile ET: **{et:.2f} seconds** (weight = {vehicle_weight_lbs} lbs, altitude = {altitude_ft} ft)")
+    return et
 
 def show_complex_statistics(data):
     if data is None or data.empty:
@@ -195,7 +221,6 @@ def show_complex_statistics(data):
     st.dataframe(data.describe())
     st.write("### Correlation Matrix")
     st.dataframe(data.corr())
-
 
 def plot_knock_afr(data):
     knock_cols = [col for col in data.columns if "knock" in col.lower()]
@@ -214,7 +239,7 @@ def plot_knock_afr(data):
     axs[0].grid(True)
     axs[0].legend()
 
-    threshold = 1.0  # knock threshold
+    threshold = 1.0
     high_knock = data[knock_cols[0]] > threshold
     if high_knock.any():
         axs[0].scatter(time[high_knock], data[knock_cols[0]][high_knock], color='red', label="Knock > Threshold")
@@ -228,7 +253,6 @@ def plot_knock_afr(data):
     axs[1].legend()
 
     st.pyplot(fig)
-
 
 def plot_timing_heatmap(data):
     required_cols = ['RPM (RPM)', 'Calculated Load (g/rev)', 'Ignition Timing (°)']
@@ -246,7 +270,6 @@ def plot_timing_heatmap(data):
     except Exception as e:
         st.warning(f"⚠️ Error generating heatmap: {e}")
 
-
 def filter_data(data, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, throttle_col, load_col):
     if data is None:
         st.warning("⚠️ No data to filter.")
@@ -262,7 +285,6 @@ def filter_data(data, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, th
     except Exception as e:
         st.warning(f"⚠️ Error filtering data: {e}")
     return filtered
-
 
 def plot_compare_logs(data1, data2):
     if data1 is None or data2 is None:
@@ -289,7 +311,6 @@ def plot_compare_logs(data1, data2):
     except Exception as e:
         st.warning(f"⚠️ Error plotting comparison: {e}")
 
-
 def export_plot_png():
     buf = io.BytesIO()
     try:
@@ -299,53 +320,17 @@ def export_plot_png():
     except Exception as e:
         st.warning(f"⚠️ Error exporting plot: {e}")
 
-
-def estimate_quarter_mile(data, vehicle_weight_lbs=3000, altitude_ft=0):
+def calc_wheel_hp_torque(data, drivetrain_loss_pct=15):
     if data is None:
-        st.warning("⚠️ No data for quarter mile estimate.")
-        return
-
+        st.warning("⚠️ No data to calculate wheel HP/torque.")
+        return None
     if 'Estimated Horsepower' not in data.columns:
-        st.warning("⚠️ Estimated Horsepower required for 1/4 mile estimate.")
-        return
-
-    max_hp = data['Estimated Horsepower'].max()
-    if max_hp <= 0:
-        st.warning("⚠️ Invalid horsepower data for 1/4 mile estimate.")
-        return
-
-    # Altitude correction factor for power loss approx 3% per 1000 ft altitude
-    alt_factor = max(0.7, 1 - (altitude_ft / 1000) * 0.03)
-    corrected_hp = max_hp * alt_factor
-
+        st.warning("⚠️ 'Estimated Horsepower' column missing for wheel HP calculation.")
+        return data
     try:
-        et = 6.29 * (vehicle_weight_lbs / corrected_hp) ** (1 / 3)
-        st.write(f"Estimated 1/4 Mile ET: **{et:.2f} seconds** (weight = {vehicle_weight_lbs} lbs, altitude = {altitude_ft} ft, max HP = {corrected_hp:.1f})")
+        data['Wheel HP'] = data['Estimated Horsepower'] * (1 - drivetrain_loss_pct / 100)
+        if 'Req Torque (Nm)' in data.columns:
+            data['Wheel Torque (Nm)'] = data['Req Torque (Nm)'] * (1 - drivetrain_loss_pct / 100)
     except Exception as e:
-        st.warning(f"⚠️ Error calculating quarter mile estimate: {e}")
-
-
-def estimate_0_60(data, vehicle_weight_lbs=3000, altitude_ft=0):
-    if data is None:
-        st.warning("⚠️ No data for 0-60 estimate.")
-        return
-
-    if 'Estimated Horsepower' not in data.columns:
-        st.warning("⚠️ Estimated Horsepower required for 0-60 estimate.")
-        return
-
-    max_hp = data['Estimated Horsepower'].max()
-    if max_hp <= 0:
-        st.warning("⚠️ Invalid horsepower data for 0-60 estimate.")
-        return
-
-    alt_factor = max(0.7, 1 - (altitude_ft / 1000) * 0.03)
-    corrected_hp = max_hp * alt_factor
-
-    try:
-        # Approximate 0-60 mph time (seconds)
-        # Using formula: t = 5.825 * (weight/hp)^0.333 (based on some general performance data)
-        zero_to_sixty = 5.825 * (vehicle_weight_lbs / corrected_hp) ** (1 / 3)
-        st.write(f"Estimated 0-60 mph: **{zero_to_sixty:.2f} seconds** (weight = {vehicle_weight_lbs} lbs, altitude = {altitude_ft} ft, max HP = {corrected_hp:.1f})")
-    except Exception as e:
-        st.warning(f"⚠️ Error calculating 0-60 estimate: {e}")
+        st.warning(f"⚠️ Error calculating wheel HP/torque: {e}")
+    return data
