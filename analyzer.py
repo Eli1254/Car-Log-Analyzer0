@@ -21,6 +21,7 @@ def show_data_overview(data, max_rows=20):
         return
     st.write("### Data Preview")
     st.dataframe(data.head(max_rows))
+    st.write(f"Showing {min(max_rows,len(data))} rows out of {len(data)} total")
     st.write(f"Shape: {data.shape}")
     st.write("Columns:", list(data.columns))
     missing = data.isnull().sum()
@@ -155,27 +156,42 @@ def estimate_horsepower(data):
     st.pyplot(plt)
     return max_hp
 
-def estimate_zero_to_sixty(max_hp, weight_lbs, altitude_ft):
-    # Reference baseline based on your input: 
-    # 3200 lbs, 7300 ft, 300 hp, ~4.9 s 0-60
-    # Power correction for altitude (rough approx): power drops ~3% per 1000 ft
+def estimate_zero_to_sixty(max_hp, weight_lbs, altitude_ft, drivetrain, cylinders):
+    # Power loss from altitude ~3% per 1000 ft
     power_at_alt = max_hp * (1 - 0.03 * (altitude_ft / 1000))
     power_at_alt = max(power_at_alt, 1)  # Avoid division by zero or negative power
+
     weight_power_ratio = weight_lbs / power_at_alt
-    # Use calibrated formula based on your real-world 0-60
-    zero_to_sixty = 0.023 * weight_power_ratio ** 1.12  # tuned exponent and coefficient
-    zero_to_sixty = max(zero_to_sixty, 2.5)  # realistic lower bound
-    st.write(f"Estimated 0-60 mph (sec): **{zero_to_sixty:.2f}** (adjusted for weight & altitude)")
+
+    # Drivetrain factor: AWD < RWD < FWD in acceleration times (AWD best traction)
+    drivetrain_factors = {
+        'FWD': 1.10,
+        'RWD': 1.00,
+        'AWD': 0.88
+    }
+    drivetrain_factor = drivetrain_factors.get(drivetrain, 1.0)
+
+    # Cylinder factor: fewer cylinders often means less torque/power delivery smoothness
+    cylinder_factor = 1 + (8 - cylinders) * 0.03  # 8 cylinders is baseline (factor=1), downscale for fewer
+
+    base_time = 0.023 * (weight_power_ratio ** 1.12)  # base formula from before
+
+    zero_to_sixty = base_time * drivetrain_factor * cylinder_factor
+
+    # Clamp realistic lower limit based on drivetrain, e.g. 3s for AWD and 3.5 for others for this car class
+    min_time = 2.7 if drivetrain == "AWD" else 3.3
+    zero_to_sixty = max(zero_to_sixty, min_time)
+
+    st.write(f"Estimated 0-60 mph (sec): **{zero_to_sixty:.2f}** (adjusted for weight, altitude, drivetrain & cylinders)")
     return zero_to_sixty
 
 def estimate_quarter_mile(max_hp, weight_lbs, altitude_ft):
-    # Similar altitude power adjustment
     power_at_alt = max_hp * (1 - 0.03 * (altitude_ft / 1000))
     power_at_alt = max(power_at_alt, 1)
     weight_power_ratio = weight_lbs / power_at_alt
-    # Calibrated formula to your low 13s quarter mile
+
     quarter_mile_time = 5.9 * weight_power_ratio ** 0.36
-    quarter_mile_time = max(quarter_mile_time, 9.5)  # Lower bound for quick cars
+    quarter_mile_time = max(quarter_mile_time, 9.5)
     st.write(f"Estimated 1/4 Mile ET (sec): **{quarter_mile_time:.2f}** (adjusted for weight & altitude)")
     return quarter_mile_time
 
