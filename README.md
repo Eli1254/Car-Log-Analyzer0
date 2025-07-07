@@ -12,10 +12,8 @@ A user-friendly web app to analyze and visualize car log CSV data.
 ✅ Download augmented data
 
 ## 🚀 How to run
+1. Download file via accessport manager
+2. Run app and install dependecies (if needed):
+3. Upload csv file to app and view results
 
-1️⃣ Install dependencies:
-```bash
-pip install -r requirements.txt
-2️⃣ Run the app:
-streamlit run app.py
-3️⃣ The app will open in your browser at http://localhost:8501.
+*Beta Version (Tested for subaru but may work with other vehicles using csvs through COBB or Open Source)*
