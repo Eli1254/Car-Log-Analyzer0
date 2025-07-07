@@ -14,7 +14,7 @@ from analyzer import (
 
 st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
-st.title("🚗 Car Log Analyzer")
+st.title("Car Log Analyzer")
 
 st.sidebar.header("Upload and Configure")
 
