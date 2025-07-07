@@ -1,10 +1,10 @@
 # Car-Log-Analyzer0
 Data log analysis Beta
-# 🚗 Car Log Analyzer — Streamlit App
+# Car Log Analyzer — Streamlit App
 
 A user-friendly web app to analyze and visualize car log CSV data.
 
-## 🧰 Features
+## Features
 ✅ Upload CSV log file  
 ✅ Visualize any sensor over time  
 ✅ Estimate horsepower  
