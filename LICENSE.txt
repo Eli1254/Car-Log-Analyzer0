@@ -1,2 +1,20 @@
-This software is proprietary and for demonstration purposes only.
-Do not reproduce or distribute without written consent.
+Copyright © 2025 Eli Smith
+
+All Rights Reserved.
+
+This software and its associated source code (“Car Log Analyzer”) are the intellectual property of the copyright holder and are provided for demonstration and evaluation purposes only.
+
+You are not permitted to:
+- Copy, modify, merge, publish, distribute, sublicense, or sell copies of this software or its source code.
+- Use this software or its source code for any commercial or production purposes.
+- Create derivative works based on this software without express written consent of the copyright holder.
+
+You may:
+- View and interact with the publicly deployed version of this software for personal, non-commercial evaluation and feedback purposes.
+- Provide feedback, suggestions, or report issues to the copyright holder.
+
+THIS SOFTWARE IS PROVIDED “AS IS” WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+For licensing inquiries, please contact: WestWrks0@gmail.com
+
+
