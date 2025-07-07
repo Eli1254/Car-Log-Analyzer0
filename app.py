@@ -14,17 +14,33 @@ from analyzer import (
 
 st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
-st.title("🚗 Car Log Analyzer")
+st.title("🚘 Car Log Analyzer")
+st.markdown("""
+Welcome to the **Car Log Analyzer** — a tool for enthusiasts and tuners to explore, visualize,  
+and better understand your car's datalog CSV files.  
+Upload your log file and start exploring trends, anomalies, and estimated performance.  
+""")
 
-st.sidebar.header("Upload and Configure")
-
-uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
+# Upload CSV file
+uploaded_file = st.file_uploader("📁 Upload your datalog CSV file here:", type=["csv"])
 
 if uploaded_file:
     data = load_data(uploaded_file)
 
     if data is not None:
-        st.sidebar.subheader("Smoothing Settings")
+        # Data Preview Row Slider
+        max_rows = st.slider(
+            "🔍 Number of rows to preview in data overview:",
+            min_value=5,
+            max_value=100,
+            value=20,
+            step=5
+        )
+
+        st.header("📊 Data Overview")
+        show_data_overview(data, max_rows=max_rows)
+
+        st.sidebar.header("Smoothing Settings")
         smoothing_preset = st.sidebar.selectbox(
             "Smoothing Preset",
             ["Light Smooth", "Medium Smooth", "Heavy Smooth", "Custom"],
@@ -54,9 +70,6 @@ if uploaded_file:
             [col for col in data.columns if pd.api.types.is_numeric_dtype(data[col])],
             index=0
         )
-
-        st.header("📊 Data Overview")
-        show_data_overview(data, max_rows=20)
 
         st.header("📈 Visualizations")
 
@@ -98,5 +111,7 @@ if uploaded_file:
         with tabs[6]:
             st.subheader("Complex Statistics")
             show_complex_statistics(data)
+else:
+    st.info("⬆️ Please upload a datalog CSV file to get started.")
 
 
