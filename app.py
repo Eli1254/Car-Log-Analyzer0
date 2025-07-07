@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+
 from analyzer import (
     load_data,
     plot_sensor_data,
@@ -12,111 +13,124 @@ from analyzer import (
     plot_3d_timing_table,
     plot_with_events,
     estimate_quarter_mile,
-    estimate_0_60_time,
+    estimate_0_60_time
 )
 
 st.set_page_config(page_title="Car Log Analyzer", layout="wide")
 
 st.title("🚗 Car Log Analyzer")
 st.markdown("""
-Analyze and visualize your car's performance logs.  
-Upload a `.csv` log file and explore a variety of graphs, statistics, and performance estimates.
+Welcome to **Car Log Analyzer** — a powerful yet easy-to-use tool for automotive enthusiasts and tuners!  
+Upload one or two log files (`.csv`) to explore your car’s performance metrics, visualize data, and estimate key times.
 """)
 
-# Upload file
-uploaded_file = st.file_uploader("Upload your car log CSV", type=["csv"])
+# --- Sidebar: user inputs
+st.sidebar.header("Settings")
+vehicle_weight = st.sidebar.number_input("Vehicle Weight (lbs)", 1000, 10000, 3000, 50)
+altitude = st.sidebar.number_input("Altitude (ft)", 0, 15000, 0, 100)
 
-data = None
-if uploaded_file:
-    data = load_data(uploaded_file)
+smoothing_window = st.sidebar.slider("Smoothing Window Length", min_value=5, max_value=101, step=2, value=51)
+poly_order = st.sidebar.slider("Smoothing Polynomial Order", min_value=1, max_value=5, value=3)
 
-if data is not None:
-    st.subheader("📊 Data Preview")
-    preview_rows = st.slider(
-        "Select number of rows to preview:",
-        min_value=5, max_value=min(len(data), 100), value=10, step=5
-    )
-    st.dataframe(data.head(preview_rows))
+rows_preview = st.sidebar.slider("Rows to preview", min_value=5, max_value=50, value=10)
 
-    # Sidebar for inputs
-    st.sidebar.header("Vehicle & Environment Inputs")
+# --- File upload(s)
+st.subheader("Upload Log File(s)")
+uploaded_file1 = st.file_uploader("Upload your primary log CSV", type=["csv"], key="file1")
+uploaded_file2 = st.file_uploader("Optional: upload second log for comparison", type=["csv"], key="file2")
 
-    vehicle_weight = st.sidebar.number_input(
-        "Vehicle Weight (lbs)",
-        min_value=1000, max_value=10000, value=3000, step=10,
-        help="Weight of your car including driver."
-    )
+data1 = load_data(uploaded_file1) if uploaded_file1 else None
+data2 = load_data(uploaded_file2) if uploaded_file2 else None
 
-    altitude = st.sidebar.number_input(
-        "Altitude (feet)",
-        min_value=0, max_value=15000, value=0, step=100,
-        help="Approximate elevation above sea level."
-    )
+if not data1:
+    st.info("👆 Please upload at least one log file to get started.")
+    st.stop()
 
-    # User actions
-    st.subheader("📈 Visualization & Analysis")
+# --- Data preview
+st.subheader("📊 Data Preview")
+st.write("Primary Log Data:")
+st.dataframe(data1.head(rows_preview))
 
-    option = st.selectbox(
-        "Choose an analysis option:",
-        [
-            "Sensor Data Visualization",
-            "3D Timing Table",
-            "Boost vs RPM",
-            "Torque vs RPM",
-            "Boost vs Required Torque",
-            "Estimate Horsepower",
-            "Show Complex Statistics",
-            "Filter Data by Time Range",
-            "Plot Sensor Data with Event Markers",
-            "Estimate 1/4 Mile ET",
-            "Estimate 0-60 mph Time",
-        ]
-    )
+if data2 is not None:
+    st.write("Comparison Log Data:")
+    st.dataframe(data2.head(rows_preview))
 
-    if option == "Sensor Data Visualization":
-        sensor_name = st.selectbox("Select sensor to visualize", data.columns)
-        plot_sensor_data(data, sensor_name)
+# --- Mode selector
+analysis_mode = st.selectbox(
+    "Select Analysis Mode:",
+    [
+        "Sensor Data Visualization",
+        "3D Timing Table",
+        "Boost vs RPM",
+        "Torque vs RPM",
+        "Boost vs Torque",
+        "Estimate Horsepower",
+        "Estimate 1/4 Mile ET",
+        "Estimate 0-60 mph",
+        "Complex Statistics",
+        "Filter by Time Range",
+        "Plot Sensor Data with Event Markers",
+        "Compare Two Logs"
+    ]
+)
 
-    elif option == "3D Timing Table":
-        plot_3d_timing_table(data)
+# --- Perform selected analysis
+if analysis_mode == "Sensor Data Visualization":
+    sensor = st.selectbox("Select sensor", data1.columns)
+    plot_sensor_data(data1, sensor)
 
-    elif option == "Boost vs RPM":
-        plot_boost_vs_rpm(data)
+elif analysis_mode == "3D Timing Table":
+    plot_3d_timing_table(data1)
 
-    elif option == "Torque vs RPM":
-        plot_torque_vs_rpm(data)
+elif analysis_mode == "Boost vs RPM":
+    plot_boost_vs_rpm(data1, smoothing_window, poly_order)
 
-    elif option == "Boost vs Required Torque":
-        plot_boost_vs_torque(data)
+elif analysis_mode == "Torque vs RPM":
+    plot_torque_vs_rpm(data1, smoothing_window, poly_order)
 
-    elif option == "Estimate Horsepower":
-        data = estimate_horsepower_from_torque(data)
-        if 'Estimated Horsepower' in data.columns:
-            st.dataframe(data[['RPM (RPM)', 'Estimated Horsepower']].head())
+elif analysis_mode == "Boost vs Torque":
+    plot_boost_vs_torque(data1, smoothing_window, poly_order)
 
-    elif option == "Show Complex Statistics":
-        show_complex_statistics(data)
+elif analysis_mode == "Estimate Horsepower":
+    data1 = estimate_horsepower_from_torque(data1)
+    if "Estimated Horsepower" in data1.columns:
+        st.write(data1[["RPM (RPM)", "Estimated Horsepower"]].head())
 
-    elif option == "Filter Data by Time Range":
-        start_time = st.number_input("Start Time (sec):", value=0.0)
-        end_time = st.number_input("End Time (sec):", value=float(data['Time (sec)'].max()))
-        filtered_data = filter_by_time_range(data, start_time, end_time)
-        st.dataframe(filtered_data)
+elif analysis_mode == "Estimate 1/4 Mile ET":
+    if "Estimated Horsepower" not in data1.columns:
+        st.warning("Please run 'Estimate Horsepower' first.")
+    else:
+        estimate_quarter_mile(data1, vehicle_weight, altitude)
 
-    elif option == "Plot Sensor Data with Event Markers":
-        sensor_name = st.selectbox("Select sensor for event markers", data.columns)
-        events = [
-            {'time': 50, 'label': 'Max RPM'},
-            {'time': 100, 'label': 'Overheating'}
-        ]
-        plot_with_events(data, sensor_name, events)
+elif analysis_mode == "Estimate 0-60 mph":
+    if "Estimated Horsepower" not in data1.columns:
+        st.warning("Please run 'Estimate Horsepower' first.")
+    else:
+        estimate_0_60_time(data1, vehicle_weight, altitude)
 
-    elif option == "Estimate 1/4 Mile ET":
-        estimate_quarter_mile(data, vehicle_weight, altitude)
+elif analysis_mode == "Complex Statistics":
+    show_complex_statistics(data1)
 
-    elif option == "Estimate 0-60 mph Time":
-        estimate_0_60_time(data, vehicle_weight, altitude)
+elif analysis_mode == "Filter by Time Range":
+    start = st.number_input("Start Time (sec):", value=0.0)
+    end = st.number_input("End Time (sec):", value=float(data1['Time (sec)'].max()))
+    filtered = filter_by_time_range(data1, start, end)
+    st.dataframe(filtered.head(rows_preview))
 
-else:
-    st.info("👆 Please upload a CSV file to get started.")
+elif analysis_mode == "Plot Sensor Data with Event Markers":
+    sensor = st.selectbox("Select sensor", data1.columns)
+    events = [
+        {'time': 50, 'label': 'Max RPM'},
+        {'time': 100, 'label': 'Overheating'}
+    ]
+    plot_with_events(data1, sensor, events)
 
+elif analysis_mode == "Compare Two Logs":
+    if data2 is None:
+        st.warning("Please upload a second log file.")
+    else:
+        sensor = st.selectbox("Select sensor to compare", data1.columns)
+        st.line_chart(pd.DataFrame({
+            "Log 1": data1[sensor],
+            "Log 2": data2[sensor]
+        }))
