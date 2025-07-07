@@ -1,18 +1,14 @@
-# analyzer.py
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from mpl_toolkits.mplot3d import Axes3D
 from io import BytesIO
-
 
 class CarLogAnalyzer:
     def __init__(self, data: pd.DataFrame):
         self.data = data
 
-    def plot_sensor(self, sensor: str) -> BytesIO:
+    def plot_sensor(self, sensor: str, events=None) -> BytesIO:
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.plot(self.data['Time (sec)'], self.data[sensor], label=sensor)
         ax.set_xlabel("Time (sec)")
@@ -20,6 +16,13 @@ class CarLogAnalyzer:
         ax.set_title(f"{sensor} over Time")
         ax.grid()
         ax.legend()
+
+        if events:
+            for event in events:
+                ax.axvline(x=event["time"], color="red", linestyle="--", alpha=0.7)
+                ax.text(event["time"], self.data[sensor].min(), event["label"],
+                        rotation=90, verticalalignment="bottom", fontsize=8)
+
         return self._fig_to_buf(fig)
 
     def estimate_horsepower(self) -> BytesIO:
@@ -69,3 +72,5 @@ class CarLogAnalyzer:
         plt.close(fig)
         buf.seek(0)
         return buf
+
+
