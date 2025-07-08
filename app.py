@@ -106,11 +106,11 @@ if uploaded_file_1:
         # --- MAIN PAGE ---
         max_rows = st.slider("🔍 Rows to preview", 5, 500, 20, 5)
 
-        st.header("📊 Data Overview - Primary Log")
+        st.header("Data Overview - Primary Log")
         show_data_overview(data1_filtered, max_rows=max_rows)
 
         if data2_filtered is not None:
-            st.header("📊 Data Overview - Secondary Log")
+            st.header("Data Overview - Secondary Log")
             show_data_overview(data2_filtered, max_rows=max_rows)
 
         st.header("📈 Visualizations")
@@ -177,4 +177,4 @@ if uploaded_file_1:
             export_plot_png()
 
 else:
-    st.info("⬆️ Upload at least one datalog CSV to get started.")
+    st.info("⬆ Upload at least one datalog CSV to get started.")
