@@ -15,8 +15,6 @@ from analyzer import (
     export_plot_png,
     filter_data,
     plot_compare_logs,
-    estimate_quarter_mile,
-    estimate_0_60,
 )
 
 st.set_page_config(page_title="Car Log Analyzer Plus", layout="wide")
@@ -111,7 +109,6 @@ if uploaded_file_1:
                 custom_events.append({'time': t, 'label': label.strip()})
 
         # --- MAIN PAGE ---
-
         max_rows = st.slider("🔍 Rows to preview", 5, 100, 20, 5)
 
         st.header("📊 Data Overview - Primary Log")
@@ -132,7 +129,6 @@ if uploaded_file_1:
             "Knock & AFR Analysis",
             "Ignition Timing Heatmap",
             "Compare Logs",
-            "Quarter Mile & 0–60 Estimation",
             "Statistics",
             "Export"
         ])
@@ -178,15 +174,10 @@ if uploaded_file_1:
                 st.info("Upload second log to enable comparison.")
 
         with tabs[9]:
-            st.subheader("Quarter Mile & 0–60 Estimation")
-            estimate_quarter_mile(data1_filtered, vehicle_weight, altitude)
-            estimate_0_60(data1_filtered, vehicle_weight, altitude)
-
-        with tabs[10]:
             st.subheader("Complex Statistics")
             show_complex_statistics(data1_filtered)
 
-        with tabs[11]:
+        with tabs[10]:
             st.subheader("Export Plots")
             export_plot_png()
 
