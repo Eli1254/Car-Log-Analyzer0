@@ -10,17 +10,24 @@ def load_data(file):
     try:
         # Try utf-8 first
         data = pd.read_csv(file, encoding="utf-8")
+        if data.empty or len(data.columns) == 0:
+            raise ValueError("No columns found — check file contents and delimiter.")
         st.success("✅ Data loaded successfully (UTF‑8).")
         return data
     except UnicodeDecodeError:
         try:
             # Fallback to ISO-8859-1
             data = pd.read_csv(file, encoding="ISO-8859-1")
+            if data.empty or len(data.columns) == 0:
+                raise ValueError("No columns found — check file contents and delimiter.")
             st.warning("⚠️ File loaded with ISO‑8859‑1 encoding.")
             return data
         except Exception as e:
             st.error(f"❌ Failed to load file: {e}")
             return None
+    except ValueError as ve:
+        st.error(f"❌ {ve}")
+        return None
     except Exception as e:
         st.error(f"❌ Failed to load file: {e}")
         return None
