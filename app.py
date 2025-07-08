@@ -1,92 +1,194 @@
 import streamlit as st
 import pandas as pd
-from analyzer import *
+from analyzer import (
+    load_data,
+    show_data_overview,
+    plot_sensor_data,
+    plot_3d_timing_table,
+    plot_boost_vs_rpm,
+    plot_torque_vs_rpm,
+    plot_boost_vs_torque,
+    estimate_horsepower,
+    show_complex_statistics,
+    plot_knock_afr,
+    plot_timing_heatmap,
+    export_plot_png,
+    filter_data,
+    plot_compare_logs,
+    estimate_quarter_mile,
+    estimate_0_60,
+)
 
-st.set_page_config(page_title="Car Log Analyzer", layout="wide")
+st.set_page_config(page_title="Car Log Analyzer Plus", layout="wide")
 
-st.title("Car Log Analyzer")
+st.title("🚘 Car Log Analyzer Plus")
+st.markdown("""
+Upload your datalog CSV(s) and explore detailed analyses, filtering, smoothing, event marking, and export capabilities.
+""")
 
-uploaded_file_1 = st.file_uploader("Upload primary log CSV", type=["csv"])
-uploaded_file_2 = st.file_uploader("Upload secondary log CSV (optional)", type=["csv"])
+# Vehicle params sidebar
+st.sidebar.header("Vehicle Parameters")
+vehicle_weight = st.sidebar.number_input("Vehicle Weight (lbs)", min_value=1000, max_value=6000, value=3000, step=50)
+altitude = st.sidebar.number_input("Altitude (ft)", min_value=0, max_value=15000, value=0, step=100)
+
+# Upload files
+uploaded_file_1 = st.file_uploader("📁 Upload primary datalog CSV", type=["csv"], key="file1")
+uploaded_file_2 = st.file_uploader("📁 (Optional) Upload secondary CSV for comparison", type=["csv"], key="file2")
 
 if uploaded_file_1:
     data1 = load_data(uploaded_file_1)
     data2 = load_data(uploaded_file_2) if uploaded_file_2 else None
 
-    if data1 is not None:
-        weight = st.sidebar.number_input("Vehicle weight (lbs)", 1000, 6000, 3200)
-        altitude = st.sidebar.number_input("Altitude (ft)", 0, 15000, 7300)
+    if data1 is None or (uploaded_file_2 and data2 is None):
+        st.error("Failed to load one or both files.")
+    else:
+        # --- FILTER SLIDERS ---
+        st.sidebar.header("Data Filtering")
+        rpm_min, rpm_max = st.sidebar.slider(
+            "RPM Range",
+            int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max()),
+            (int(data1['RPM (RPM)'].min()), int(data1['RPM (RPM)'].max()))
+        )
 
-        st.sidebar.header("Smoothing")
-        preset = st.sidebar.selectbox("Preset", ["Light", "Medium", "Heavy", "Custom"], index=1)
-        if preset == "Light":
-            wl, po = 21, 2
-        elif preset == "Medium":
-            wl, po = 51, 3
-        elif preset == "Heavy":
-            wl, po = 101, 2
+        throttle_col = next((col for col in data1.columns if 'throttle' in col.lower()), None)
+        if throttle_col:
+            thr_min, thr_max = st.sidebar.slider(
+                f"{throttle_col} Range (%)",
+                float(data1[throttle_col].min()), float(data1[throttle_col].max()),
+                (float(data1[throttle_col].min()), float(data1[throttle_col].max()))
+            )
         else:
-            wl = st.sidebar.slider("Window Length", 5, 201, 51, 2)
-            po = st.sidebar.slider("Poly Order", 1, 5, 3)
+            thr_min, thr_max = None, None
 
+        load_col = next((col for col in data1.columns if 'load' in col.lower()), None)
+        if load_col:
+            load_min, load_max = st.sidebar.slider(
+                f"{load_col} Range",
+                float(data1[load_col].min()), float(data1[load_col].max()),
+                (float(data1[load_col].min()), float(data1[load_col].max()))
+            )
+        else:
+            load_min, load_max = None, None
+
+        data1_filtered = filter_data(data1, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, throttle_col, load_col)
+        data2_filtered = filter_data(data2, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, throttle_col, load_col) if data2 is not None else None
+
+        # --- SMOOTHING CONTROLS ---
+        st.sidebar.header("Smoothing Settings")
+        smoothing_preset = st.sidebar.selectbox(
+            "Smoothing Preset",
+            ["Light Smooth", "Medium Smooth", "Heavy Smooth", "Custom"],
+            index=1
+        )
+        if smoothing_preset == "Light Smooth":
+            window_length, poly_order = 21, 2
+        elif smoothing_preset == "Medium Smooth":
+            window_length, poly_order = 51, 3
+        elif smoothing_preset == "Heavy Smooth":
+            window_length, poly_order = 101, 2
+        else:
+            window_length = st.sidebar.slider("Window Length", 5, 201, 51, 2)
+            poly_order = st.sidebar.slider("Polynomial Order", 1, 5, 3)
+
+        # --- EVENT MARKERS ---
+        st.sidebar.header("Event Markers")
+        highlight_events = st.sidebar.checkbox("Highlight Significant Events?", value=False)
+        important_metric = None
+        if highlight_events:
+            important_metric = st.sidebar.selectbox(
+                "Metric to Highlight",
+                [col for col in data1.columns if pd.api.types.is_numeric_dtype(data1[col])],
+                index=0
+            )
+
+        st.sidebar.subheader("Custom Events")
+        custom_events = []
+        event_count = st.sidebar.number_input("Number of custom events", 0, 10, 0, 1)
+        for i in range(event_count):
+            t = st.sidebar.number_input(f"Event {i+1} time (sec)", 0.0, float(data1['Time (sec)'].max()), 0.0)
+            label = st.sidebar.text_input(f"Event {i+1} label", "")
+            if label.strip():
+                custom_events.append({'time': t, 'label': label.strip()})
+
+        # --- MAIN PAGE ---
+
+        max_rows = st.slider("🔍 Rows to preview", 5, 100, 20, 5)
+
+        st.header("📊 Data Overview - Primary Log")
+        show_data_overview(data1_filtered, max_rows=max_rows)
+
+        if data2_filtered is not None:
+            st.header("📊 Data Overview - Secondary Log")
+            show_data_overview(data2_filtered, max_rows=max_rows)
+
+        st.header("📈 Visualizations")
         tabs = st.tabs([
-            "Data Overview", "Sensor Over Time", "3D Timing Table",
-            "Boost vs RPM", "Torque vs RPM", "Estimated Horsepower",
-            "0-60 & ¼‑mile", "Knock & AFR", "Timing Heatmap",
-            "Compare Logs", "Export Plot"
+            "Sensor over Time",
+            "3D Timing Table",
+            "Boost vs RPM",
+            "Torque vs RPM",
+            "Boost vs Torque",
+            "Estimated HP",
+            "Knock & AFR Analysis",
+            "Ignition Timing Heatmap",
+            "Compare Logs",
+            "Quarter Mile & 0–60 Estimation",
+            "Statistics",
+            "Export"
         ])
 
         with tabs[0]:
-            max_rows = st.slider(
-                "Rows to display in data preview",
-                min_value=5,
-                max_value=int(min(100, data1.shape[0])),
-                value=20,
-                step=5
-            )
-            show_data_overview(data1, max_rows)
+            st.subheader("Sensor Data over Time")
+            sensor = st.selectbox("Select sensor:", data1.columns)
+            plot_sensor_data(data1_filtered, sensor, highlight_events, important_metric, custom_events)
 
         with tabs[1]:
-            sensor = st.selectbox("Sensor", data1.columns)
-            plot_sensor_data(data1, sensor)
+            st.subheader("3D Timing Table")
+            plot_3d_timing_table(data1_filtered)
 
         with tabs[2]:
-            plot_3d_timing_table(data1)
+            st.subheader("Boost vs RPM (Smoothed)")
+            plot_boost_vs_rpm(data1_filtered, window_length, poly_order)
 
         with tabs[3]:
-            plot_boost_vs_rpm(data1, wl, po)
+            st.subheader("Torque vs RPM (Smoothed)")
+            plot_torque_vs_rpm(data1_filtered, window_length, poly_order)
 
         with tabs[4]:
-            plot_torque_vs_rpm(data1, wl, po)
+            st.subheader("Boost vs Torque (Smoothed)")
+            plot_boost_vs_torque(data1_filtered, window_length, poly_order)
 
         with tabs[5]:
-            data1 = estimate_horsepower(data1)
+            st.subheader("Estimated Horsepower vs RPM")
+            estimate_horsepower(data1_filtered)
 
         with tabs[6]:
-            if 'Estimated Horsepower' not in data1.columns:
-                data1 = estimate_horsepower(data1)
-            max_hp = data1['Estimated Horsepower'].max()
-            t_0_60 = estimate_zero_to_sixty(weight, altitude, max_hp)
-            et_1_4 = estimate_quarter_mile(weight, altitude, max_hp)
-            st.metric("0–60 mph", f"{t_0_60:.2f} sec")
-            st.metric("¼‑mile ET", f"{et_1_4:.2f} sec")
+            st.subheader("Knock & AFR Analysis")
+            plot_knock_afr(data1_filtered)
 
         with tabs[7]:
-            plot_knock_afr(data1)
+            st.subheader("Ignition Timing Heatmap")
+            plot_timing_heatmap(data1_filtered)
 
         with tabs[8]:
-            plot_timing_heatmap(data1)
+            if data2_filtered is not None:
+                st.subheader("Compare Logs Overlay")
+                plot_compare_logs(data1_filtered, data2_filtered)
+            else:
+                st.info("Upload second log to enable comparison.")
 
         with tabs[9]:
-            if data2 is not None:
-                sensor_cmp = st.selectbox("Sensor to compare", data1.columns)
-                plot_compare_logs(data1, data2, sensor_cmp)
-            else:
-                st.info("Upload a secondary log to enable comparison.")
+            st.subheader("Quarter Mile & 0–60 Estimation")
+            estimate_quarter_mile(data1_filtered, vehicle_weight, altitude)
+            estimate_0_60(data1_filtered, vehicle_weight, altitude)
 
         with tabs[10]:
+            st.subheader("Complex Statistics")
+            show_complex_statistics(data1_filtered)
+
+        with tabs[11]:
+            st.subheader("Export Plots")
             export_plot_png()
-    else:
-        st.error("Failed to load primary log.")
+
 else:
-    st.info("Upload a CSV to start.")
+    st.info("⬆️ Upload at least one datalog CSV to get started.")
