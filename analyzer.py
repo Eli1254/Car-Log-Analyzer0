@@ -8,26 +8,35 @@ import io
 
 def load_data(file):
     try:
-        # Try utf-8 first
-        data = pd.read_csv(file, encoding="utf-8")
-        if data.empty or len(data.columns) == 0:
-            raise ValueError("No columns found — check file contents and delimiter.")
-        st.success("✅ Data loaded successfully (UTF‑8).")
-        return data
+        # Read the file as text buffer
+        file.seek(0)  # ensure pointer is at start
+        df = pd.read_csv(file, encoding='utf-8')
+        if df.empty:
+            raise ValueError("The file was read but contains no rows.")
+        if len(df.columns) <= 1:
+            # maybe wrong delimiter
+            file.seek(0)
+            df = pd.read_csv(file, encoding='utf-8', delimiter=';')
+            if len(df.columns) <= 1:
+                raise ValueError("Could not detect columns. Check if your file is a proper CSV.")
+        st.success("✅ Data loaded successfully.")
+        return df
     except UnicodeDecodeError:
         try:
-            # Fallback to ISO-8859-1
-            data = pd.read_csv(file, encoding="ISO-8859-1")
-            if data.empty or len(data.columns) == 0:
-                raise ValueError("No columns found — check file contents and delimiter.")
-            st.warning("⚠️ File loaded with ISO‑8859‑1 encoding.")
-            return data
+            file.seek(0)
+            df = pd.read_csv(file, encoding='ISO-8859-1')
+            if df.empty:
+                raise ValueError("The file was read but contains no rows.")
+            if len(df.columns) <= 1:
+                file.seek(0)
+                df = pd.read_csv(file, encoding='ISO-8859-1', delimiter=';')
+                if len(df.columns) <= 1:
+                    raise ValueError("Could not detect columns. Check if your file is a proper CSV.")
+            st.warning("⚠️ Loaded with ISO‑8859‑1 encoding.")
+            return df
         except Exception as e:
             st.error(f"❌ Failed to load file: {e}")
             return None
-    except ValueError as ve:
-        st.error(f"❌ {ve}")
-        return None
     except Exception as e:
         st.error(f"❌ Failed to load file: {e}")
         return None
