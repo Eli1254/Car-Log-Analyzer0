@@ -113,7 +113,7 @@ if uploaded_file_1:
             st.header("Data Overview - Secondary Log")
             show_data_overview(data2_filtered, max_rows=max_rows)
 
-        st.header("📈 Visualizations")
+        st.header("Visualizations")
         tabs = st.tabs([
             "Sensor over Time",
             "3D Timing Table",
