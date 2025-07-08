@@ -104,7 +104,7 @@ if uploaded_file_1:
                 custom_events.append({'time': t, 'label': label.strip()})
 
         # --- MAIN PAGE ---
-        max_rows = st.slider("🔍 Rows to preview", 5, 100, 20, 5)
+        max_rows = st.slider("🔍 Rows to preview", 5, 500, 20, 5)
 
         st.header("📊 Data Overview - Primary Log")
         show_data_overview(data1_filtered, max_rows=max_rows)
