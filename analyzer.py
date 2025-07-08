@@ -8,10 +8,23 @@ import io
 
 def load_data(file):
     try:
-        return pd.read_csv(file)
+        # Try utf-8 first
+        data = pd.read_csv(file, encoding="utf-8")
+        st.success("✅ Data loaded successfully (UTF‑8).")
+        return data
+    except UnicodeDecodeError:
+        try:
+            # Fallback to ISO-8859-1
+            data = pd.read_csv(file, encoding="ISO-8859-1")
+            st.warning("⚠️ File loaded with ISO‑8859‑1 encoding.")
+            return data
+        except Exception as e:
+            st.error(f"❌ Failed to load file: {e}")
+            return None
     except Exception as e:
-        st.error(f"Error loading file: {e}")
+        st.error(f"❌ Failed to load file: {e}")
         return None
+
 
 def show_data_overview(data, max_rows=20):
     st.subheader("Data Preview")
