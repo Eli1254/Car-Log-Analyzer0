@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from analyzer import (
     load_data,
     show_data_overview,
