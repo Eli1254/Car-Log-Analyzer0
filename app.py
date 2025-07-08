@@ -19,15 +19,10 @@ from analyzer import (
 
 st.set_page_config(page_title="Car Log Analyzer Plus", layout="wide")
 
-st.title("🚘 Car Log Analyzer Plus")
+st.title("Car Log Analyzer Plus")
 st.markdown("""
 Upload your datalog CSV(s) and explore detailed analyses, filtering, smoothing, event marking, and export capabilities.
 """)
-
-# Vehicle params sidebar
-st.sidebar.header("Vehicle Parameters")
-vehicle_weight = st.sidebar.number_input("Vehicle Weight (lbs)", min_value=1000, max_value=6000, value=3000, step=50)
-altitude = st.sidebar.number_input("Altitude (ft)", min_value=0, max_value=15000, value=0, step=100)
 
 # Upload files
 uploaded_file_1 = st.file_uploader("📁 Upload primary datalog CSV", type=["csv"], key="file1")
