@@ -64,3 +64,5 @@ Enjoy analyzing your car's logs!
 *Beta Version (Tested for subaru but may work with other vehicles using csvs files through COBB or Open Source software).*
 
 *Horsepower estimation is a very ball-park estimate based on rough calculations and requires the parameters: Time (sec), RPM (RPM), and Req Torque (Nm) to function properly.*
+
+Link: https://car-log-analyzer0-8wkv9hjrcmegq6fftytb39.streamlit.app/
