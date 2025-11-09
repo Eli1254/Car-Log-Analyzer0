@@ -25,8 +25,8 @@ Upload your datalog CSV(s) and explore detailed analyses, filtering, smoothing, 
 """)
 
 # Upload files
-uploaded_file_1 = st.file_uploader("📁 Upload primary datalog CSV", type=["csv"], key="file1")
-uploaded_file_2 = st.file_uploader("📁 (Optional) Upload secondary CSV for comparison", type=["csv"], key="file2")
+uploaded_file_1 = st.file_uploader("Upload primary datalog CSV", type=["csv"], key="file1")
+uploaded_file_2 = st.file_uploader("(Optional) Upload secondary CSV for comparison", type=["csv"], key="file2")
 
 if uploaded_file_1:
     data1 = load_data(uploaded_file_1)
@@ -178,3 +178,4 @@ if uploaded_file_1:
 
 else:
     st.info("⬆ Upload at least one datalog CSV to get started.")
+
