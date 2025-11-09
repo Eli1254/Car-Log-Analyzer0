@@ -11,30 +11,30 @@ from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plots
 def load_data(file):
     try:
         data = pd.read_csv(file, encoding='ISO-8859-1')
-        st.success("✅ Data loaded successfully.")
+        st.success("Data loaded successfully.")
         return data
     except FileNotFoundError:
-        st.error("❌ File not found. Please check the file.")
+        st.error("File not found. Please check the file.")
         return None
     except UnicodeDecodeError:
-        st.error("❌ File encoding error. Please ensure UTF-8 or ISO-8859-1 encoding.")
+        st.error("File encoding error. Please ensure UTF-8 or ISO-8859-1 encoding.")
         return None
     except Exception as e:
-        st.error(f"❌ Unexpected error loading file: {e}")
+        st.error(f"Unexpected error loading file: {e}")
         return None
 
 
 def check_required_columns(data, required_cols, context=""):
     missing = [col for col in required_cols if col not in data.columns]
     if missing:
-        st.warning(f"⚠️ Missing required columns for {context}: {', '.join(missing)}")
+        st.warning(f"Missing required columns for {context}: {', '.join(missing)}")
         return False
     return True
 
 
 def show_data_overview(data, max_rows=20):
     if data is None or data.empty:
-        st.warning("⚠️ No data to preview.")
+        st.warning("No data to preview.")
         return
     st.write("### Data Preview")
     st.dataframe(data.head(max_rows))
@@ -47,7 +47,7 @@ def show_data_overview(data, max_rows=20):
         st.write("### Missing Values")
         st.dataframe(missing)
     else:
-        st.write("✅ No missing values detected.")
+        st.write("No missing values detected.")
 
 
 def plot_sensor_data(data, sensor, highlight_events=False, metric=None, custom_events=None):
@@ -75,7 +75,7 @@ def plot_sensor_data(data, sensor, highlight_events=False, metric=None, custom_e
                 plt.axvline(x=event['time'], color='purple', linestyle=':')
                 plt.text(event['time'], data[sensor].min(), event['label'], rotation=90, verticalalignment='bottom', color='purple')
             else:
-                st.warning(f"⚠️ Custom event time {event['time']} out of data range.")
+                st.warning(f"Custom event time {event['time']} out of data range.")
 
     st.pyplot(plt)
 
@@ -106,7 +106,7 @@ def _safe_savgol_filter(series, window_length=51, poly_order=3):
     try:
         length = len(series)
         if length < 5:
-            st.warning("⚠️ Not enough data points to apply smoothing.")
+            st.warning("Not enough data points to apply smoothing.")
             return series
         wl = min(window_length, length if length % 2 != 0 else length - 1)
         if wl < poly_order + 2:
@@ -115,7 +115,7 @@ def _safe_savgol_filter(series, window_length=51, poly_order=3):
             wl = length if length % 2 != 0 else length - 1
         return savgol_filter(series, window_length=wl, polyorder=poly_order)
     except Exception as e:
-        st.warning(f"⚠️ Error smoothing data: {e}")
+        st.warning(f"Error smoothing data: {e}")
         return series
 
 
@@ -201,7 +201,7 @@ def plot_knock_afr(data):
     knock_cols = [col for col in data.columns if "knock" in col.lower()]
     afr_cols = [col for col in data.columns if "afr" in col.lower()]
     if not knock_cols or not afr_cols:
-        st.warning("⚠️ No knock or AFR columns found.")
+        st.warning("No knock or AFR columns found.")
         return
 
     fig, axs = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
@@ -244,12 +244,12 @@ def plot_timing_heatmap(data):
         plt.ylabel("RPM")
         st.pyplot(plt)
     except Exception as e:
-        st.warning(f"⚠️ Error generating heatmap: {e}")
+        st.warning(f"Error generating heatmap: {e}")
 
 
 def filter_data(data, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, throttle_col, load_col):
     if data is None:
-        st.warning("⚠️ No data to filter.")
+        st.warning("No data to filter.")
         return None
 
     filtered = data
@@ -260,18 +260,18 @@ def filter_data(data, rpm_min, rpm_max, thr_min, thr_max, load_min, load_max, th
         if load_col and load_min is not None and load_max is not None:
             filtered = filtered[(filtered[load_col] >= load_min) & (filtered[load_col] <= load_max)]
     except Exception as e:
-        st.warning(f"⚠️ Error filtering data: {e}")
+        st.warning(f"Error filtering data: {e}")
     return filtered
 
 
 def plot_compare_logs(data1, data2):
     if data1 is None or data2 is None:
-        st.warning("⚠️ Both logs are required for comparison.")
+        st.warning("Both logs are required for comparison.")
         return
 
     sensors = [col for col in data1.columns if pd.api.types.is_numeric_dtype(data1[col])]
     if not sensors:
-        st.warning("⚠️ No numeric sensors found for comparison.")
+        st.warning("No numeric sensors found for comparison.")
         return
 
     selected_sensor = st.selectbox("Select sensor to compare:", sensors)
@@ -287,7 +287,7 @@ def plot_compare_logs(data1, data2):
         plt.grid(True)
         st.pyplot(plt)
     except Exception as e:
-        st.warning(f"⚠️ Error plotting comparison: {e}")
+        st.warning(f"Error plotting comparison: {e}")
 
 
 def export_plot_png():
@@ -297,5 +297,6 @@ def export_plot_png():
         buf.seek(0)
         st.download_button(label="Download Last Plot as PNG", data=buf, file_name="plot.png", mime="image/png")
     except Exception as e:
-        st.warning(f"⚠️ Error exporting plot: {e}")
+        st.warning(f"Error exporting plot: {e}")
+
 
