@@ -1,6 +1,6 @@
-# Car Log Analyzer Plus - User Manual
+# Car Log Analyzer Zero - User Manual
 
-Welcome to **Car Log Analyzer Plus**, a Streamlit web app designed for automotive enthusiasts and tuners to analyze vehicle datalogs with ease.
+Welcome to **Car Log Analyzer Zero**, a Streamlit web app designed for automotive enthusiasts and tuners to analyze vehicle datalogs with ease.
 
 ---
 
